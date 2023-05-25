@@ -1,5 +1,10 @@
 package de.komantis.snacknote
 
+import android.content.Context
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -27,6 +32,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -102,12 +108,13 @@ fun SnackNoteLayout(
 
 @Preview(showBackground = true)
 @Composable
-fun SnackNoteLayoutPreview(
+internal fun SnackNoteLayoutPreview(
 
 ){
     val snackState = rememberSnackNoteState(
         durationMillis = 3000,
-        vibrationFeedback = true
+        vibrationFeedback = true,
+        context = LocalContext.current
     )
     
     val scope = rememberCoroutineScope()
@@ -136,12 +143,15 @@ fun SnackNoteLayoutPreview(
 
 class SnackNoteState(
     val durationMillis: Long,
-    val vibrationFeedBack: Boolean
+    val vibrationFeedBack: Boolean,
+    val context: Context
 ) {
     var visibleState by mutableStateOf(false)
     var clickAction: () -> Unit = {  }
     var title = ""
     var text = ""
+    private val vibrator = if(Build.VERSION.SDK_INT < Build.VERSION_CODES.S) context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                        else context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
 
     suspend fun show(
         title: String,
@@ -151,7 +161,17 @@ class SnackNoteState(
         clickAction = onClick
         this.title = title
         this.text = text
-        this
+
+        val effect = VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE)
+        if(vibrationFeedBack){
+            if(Build.VERSION.SDK_INT < Build.VERSION_CODES.S){
+                (vibrator as Vibrator).vibrate(effect)
+            }
+            else{
+                (vibrator as VibratorManager).defaultVibrator.vibrate(effect)
+            }
+        }
+
         visibleState = true
         delay(durationMillis)
         visibleState = false
@@ -161,10 +181,12 @@ class SnackNoteState(
 @Composable
 fun rememberSnackNoteState(
     durationMillis: Long,
-    vibrationFeedback: Boolean
+    vibrationFeedback: Boolean,
+    context: Context
 ): SnackNoteState{
     return remember{ SnackNoteState(
         durationMillis = durationMillis,
-        vibrationFeedBack = true
+        vibrationFeedBack = vibrationFeedback,
+        context = context
     ) }
 }
